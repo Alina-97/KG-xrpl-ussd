@@ -57,7 +57,7 @@ LOYALTY_CURRENCY=${KASI_HEX}
 `;
   fs.writeFileSync('.env.local', envData);
 
-  console.log('✅ Setup Complete! Keys saved to .env.local');
+  console.log('Setup Complete! Keys saved to .env.local');
   console.log('Tenant Address:', tenantWallet.address);
   console.log('Channel ID:', channelId);
 

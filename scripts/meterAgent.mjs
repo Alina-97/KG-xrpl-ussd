@@ -13,7 +13,7 @@ async function runSmartMeter(unitsRemaining, claimXrp) {
   console.log(`\n⚡ Smart Meter Check: ${unitsRemaining} kWh remaining.`);
 
   if (unitsRemaining < 2) {
-    console.log(`🤖 Agent autonomously claiming ${claimXrp} XRP from Payment Channel...`);
+    console.log(` Agent autonomously claiming ${claimXrp} XRP from Payment Channel...`);
     const drops = xrpl.xrpToDrops(claimXrp);
 
     const signature = xrpl.signPaymentChannelClaim(
@@ -34,7 +34,7 @@ async function runSmartMeter(unitsRemaining, claimXrp) {
 
     try {
       const claimRes = await client.submitAndWait(claimTx, { wallet: utilityWallet });
-      console.log(`✅ Power Paid! Explorer: https://xrpl.org{claimRes.result.hash}`);
+      console.log(`Power Paid! Explorer: https://xrpl.org{claimRes.result.hash}`);
 
       // Award 10 KASI Loyalty Points on XRPL
       console.log('🎁 Issuing 10 KASI Loyalty Points...');
@@ -51,7 +51,7 @@ async function runSmartMeter(unitsRemaining, claimXrp) {
       console.log(`🌟 Loyalty Reward Sent! Explorer: https://xrpl.org{rewardRes.result.hash}`);
 
     } catch (err) {
-      console.error(`🛑 BLOCKED BY XRPL LEDGER (Cap Enforced): ${err.message}`);
+      console.error(`BLOCKED BY XRPL LEDGER (Cap Enforced): ${err.message}`);
     }
   }
 
