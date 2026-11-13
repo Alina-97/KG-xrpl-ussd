@@ -1,84 +1,121 @@
-#  KasiGrid Pay: Easy Township Utilities Using Any Phone
+ShebiSpark
 
-KG helps people in South African townships buy prepaid electricity, water, and Wi-Fi—and send power to family members in other provinces—without needing a bank account, a smartphone, or mobile data.
+Power that tops itself up.
 
-By connecting simple phone menus (**USSD `*120*555#`**) to the **XRP Ledger**, a room's meter can automatically top itself up before the lights go out—while keeping the user 100% in control of how much money gets spent.
+ShebiSpark is a smart meter that buys its own electricity, water and Wi-Fi in small steps. The owner sets a budget from a basic button phone. The meter can never spend more than that budget, because the XRP Ledger enforces the limit, not our app.
 
+Built by Shebi (Mamoshebe Alina Mokhathi) for the Node Engine Hackathon 2026. GitHub: Alina-97.
 
+Testnet only. No real money is used anywhere in this project.
 
-## The Problem I Am Solving
-In townships like Soweto, Tembisa, and Khayelitsha, thousands of people rent backyard rooms with individual sub-meters, or support parents living in other provinces. They face three big headaches every week:
+The problem
 
-1. **No Bank or Mobile Data:** Many people use basic button phones without internet data, and walking to a bank branch or ATM is expensive and far away.
-2. **Midnight Blackouts & High Fees:** If your power runs out at midnight, the local spaza shop is closed. If you buy R15 of electricity on a banking app, the bank charges you up to R5 just in fees (a 33% loss).
-3. **Manual Family Support:** If your mom in Free State runs out of power while you are working in Gauteng, she has to call you in the dark so you can manually buy and read out a 20-digit voucher code.
+In townships like Tembisa, Soweto and Khayelitsha, many people rent backyard rooms with their own sub-meter.
 
+Many have a button phone with no data, and no bank app.
+Power runs out at midnight, when the spaza shop is closed.
+Bank fees can be up to R5 on a R15 purchase. That is a third of the money.
+A son working in Gauteng cannot easily keep his mom's meter topped up in another province.
+How it works
+The owner sets a budget. They dial *120*555# on any phone. No data needed. This locks XRP in an XRPL Payment Channel. That is the spending limit.
+The meter watches its own units. When power gets low, the meter acts by itself.
+The meter asks for a price. It calls the server. The server answers HTTP 402 (Payment Required) with the price.
+The meter pays with a signed voucher. It signs a small voucher. It does not need the owner's wallet.
+The server claims the money on the ledger. It checks the voucher, claims it on the XRP Ledger, and only then hands over the units.
+The owner gets KASI points. Points can be traded for free emergency power.
 
-## How KG Pay Beats Existing Banking Apps
+Every purchase leaves a receipt with a link to the XRP Ledger.
 
-| Feature | Banking Apps / WhatsApp Vouchers | KasiGrid Pay (XRPL + USSD) |
-| :--- | :--- | :--- |
-| **How it works** | **Manual:** You must wake up, open an app, buy a token, and type 20 digits into the meter. | **Automatic:** When power drops below `2 kWh`, the meter tops itself up before the lights go out. |
-| **Phone & Data** | Needs a smartphone, mobile data, and a South African bank account. | Works on any **basic button phone** via USSD (`*120*555#`)—zero data or bank needed. |
-| **Small Top-Up Fees** | Banks charge R2–R5 flat fees (up to 33% lost on a R15 purchase). | XRPL fees cost **0.00001 XRP** (fractions of a cent), making R5–R10 top-ups affordable. |
-| **Spending Safety** | Sharing a card or eWallet PIN puts your whole balance at risk. | **Ledger Safety Lock:** You lock a strict XRP cap in an XRPL Payment Channel; the meter cannot spend over it. |
-| **Multi-Service & Rewards** | Separate fees for electricity, water, and data; zero rewards. | One USSD wallet for **Power, Water & Wi-Fi**, plus **`KASI` loyalty points** for free emergency units. |
+Where the blockchain is used
+On the XRP Ledger (needs trust)	Not on the ledger (does not need it)
+The spending limit (Payment Channel)	USSD menus
+Every claim, with a public record	Meter readings
+KASI loyalty points	The real meter hardware
+Refund of unused money when a channel closes	Cash in at a spaza shop
 
+A normal database could count the budget. But only the ledger can refuse an overspend, even if our own server is hacked.
 
-## Where the Blockchain Fits (Why XRPL?)
-A normal database can be hacked or edited to overcharge tenants, and traditional payment gateways are too expensive for R10 micro-payments. Using the **XRP Ledger** gives us three features a normal app cannot match:
-1. **Unbreakable Spending Limits (`PaymentChannelCreate`):** The human user locks a strict budget on the XRP Ledger. Even if a meter glitches or gets hacked, the blockchain blocks any claim over your limit.
-2. **Fractions-of-a-Cent Fees:** Transactions settle in 3–5 seconds for `0.00001 XRP`, allowing meters to buy tiny top-ups continuously without eating up the user's money.
-3. **Cross-Service Loyalty Tokens (`KASI`):** Loyalty points are real XRPL tokens earned per kilowatt-hour delivered—meaning points earned buying electricity can be redeemed for free emergency power, water, or Wi-Fi anywhere on the network.
+Who can do what
+Who	Holds	Can	Cannot
+Owner (tenant or family)	Their own wallet	Raise the limit, stop spending	
+Meter agent	One small signing key per meter	Sign vouchers up to the limit	Raise the limit, close the channel, touch the owner wallet
+Utility (the seller)	Its own wallet	Claim vouchers, pay KASI points	Claim more than the owner locked
 
+The meter keys are in a separate file (.env.agent). The website never reads that file.
 
-## More Services & Cash-In / Cash-Out Path
-* **Send Power Home (Cross-Province Family Top-Ups):** A worker in Gauteng can dial `*120*555#` to fund a capped electricity channel for their mom's meter in Gauteng. Mom never has to type a voucher code—her meter tops itself up automatically within the limit set by her child.
-* **Beyond Electricity (Water & Township Wi-Fi):** The same XRPL Payment Channel architecture supports prepaid **smart water sub-meters** and **pay-as-you-go township Wi-Fi hotspots**.
-* **Optional Stokvel Power Pot:** Neighbours can pool small amounts into a 2-of-3 Multi-Sign community pot for midnight emergency advances, or withdraw untouched savings at year-end.
-* **Where Users Get XRP:** Banked users buy XRP/RLUSD via licensed South African exchanges (**VALR** or **Luno**). Unbanked users hand R20 cash to a registered local **spaza shop agent**, who credits their USSD wallet for a tiny commission.
+Buy for someone else
 
----
+Mom's meter (MOM-FS-402) is paid for by a sponsor wallet, like a family member far away. The sponsor sets the limit, can raise it (menu option 4), and can stop it. Mom never types a voucher code. If the sponsor stops it, the unused money goes back to the sponsor.
 
-## How the Pieces Fit Together
+More than power
 
-[ Basic Phone (*120*555#) ] ---> Set budget, check points, or send power to Mom (No data needed)
-             │
-             ▼
-[ Next.js Cloud Backend ]   ---> Connects USSD menu & meter requests to the XRP Ledger
-             │
-             ▼
-[ The XRP Ledger ]          ---> Enforces hard spending cap & issues KASI loyalty tokens
-             ▲
-             │
-[ Room Smart Meter ]        ---> Auto-buys power when units drop below 2 kWh
+Water and Wi-Fi work the same way. Each service has its own meter, its own price and its own limit. Adding a new service means adding one line in lib/shared.mjs.
 
+The four hackathon questions
+How does the customer pay in seconds from a phone they own? The owner sets the budget once on a button phone. After that, the meter pays by itself in seconds. No app, no data.
+How does the merchant know which order was paid? Each meter has its own channel. Each purchase answers one price quote. The dashboard lists every payment with its meter and a ledger link.
+How does the money reach a bank? The utility claims the money on the ledger, then cashes out through an exchange. In this demo the "Pay out to bank" button is a mock.
+If the payer is a machine, what is the most it can spend, and who can stop it? The most is the amount the owner locked. Only the owner can raise it or stop it. Stopping takes effect after a short delay (60 seconds in the demo), then the unused money returns.
+Run it
 
-## How to Run This Project on Your Computer
+You need Node.js 20 or newer.
 
-### 1. Download the Code & Install Tools
-Make sure you have **Node.js** installed, then open your terminal and run:
-```bash
-git clone https://github.com
-cd kasigrid-xrpl-ussd
-npm install
-```
-
-### 2. Set Up Your Test Accounts
-Run this setup script. It creates free test accounts on the XRPL Testnet, sets up your `20 XRP` spending limit, and turns on `KASI` loyalty points:
-```bash
-node scripts/initXrpl.mjs
-```
-
-### 3. Open the App & Phone Simulator
-Start the website locally:
-```bash
+Copy the app, lib, scripts folders and .env.example into your Next.js project (replace the old app/page.tsx and old API routes). Use the project root. If your project uses a src folder, move app and lib inside it and fix the import paths.
+Install the XRPL library:
+npm install xrpl
+Add these lines to the scripts part of package.json:
+json
+"setup": "node scripts/initXrpl.mjs",
+"agent": "node --env-file=.env.agent scripts/meterAgent.mjs",
+"agent:demo": "node --env-file=.env.agent scripts/meterAgent.mjs --drain"
+Make sure .gitignore has .env* so your keys never go on GitHub.
+Make the test accounts and channels (takes about a minute):
+npm run setup
+Start the website:
 npm run dev
-```
-Open `http://localhost:3000` in your browser to see your live spending tracker and the **KasiFone USSD handset simulator**.
+In a second terminal, start the meter:
+npm run agent:demo
+Open http://localhost:3000. The demo owner PIN is 1234.
+90-second demo
+Open the phone. Dial *120*555#, press Call, choose 2 to raise the power limit by 10 XRP.
+Watch the meter use power. When it drops below 2 kWh, the agent buys more. A new payment appears with a ledger link.
+Press Try to overspend. The meter tries to take 999 XRP. The ledger refuses. That refusal is the point.
+Choose 4 on the phone to fund Mom's meter.
+Press Stop spending on a meter to show how the owner stops it.
+What is real and what is fake
 
-### 4. Test the Auto-Top-Up Meter
-Run the meter script in your terminal to see a valid `2 XRP` top-up succeed (awarding `10 KASI` points) and an over-limit `25 XRP` claim get blocked by the XRP Ledger:
-```bash
-node scripts/meterAgent.mjs
-```
+Real: the Payment Channels, the vouchers, the claims, the KASI points and the ledger links, all on the XRPL Testnet.
+
+Demo only:
+
+The USSD phone is a simulator. A real shortcode needs a mobile network partner.
+The meter is a simulated counter. A real one would be an STS-compatible sub-meter.
+The PIN is 1234. A real system needs hashed PINs, lockouts and protection against SIM swaps.
+Data lives in memory and resets when the server restarts.
+The bank payout is a mock with a made-up rand rate.
+The server holds the owner and utility wallets for the demo. A real system would keep keys in a secure key store.
+The "Try to overspend" button needs DEMO_ALLOW_ATTACK=true. It lets the test skip our own checks so you can see the ledger refuse. Set it to false for anything real.
+Rules we still need to check
+
+Selling electricity and handling crypto are both regulated in South Africa. A real pilot needs a licensed partner. We have not done this yet.
+
+Plan for the pilot
+First customer: a backyard landlord in Tembisa with about 6 rooms, plus their tenants.
+Cash in and out: a local spaza shop agent who earns a small fee.
+Pilot: 10 landlords in Gauteng, one agent, one licensed partner.
+Money for us: a small margin on each purchase. Numbers still need to come from the pilot.
+Folder guide
+File	What it does
+app/page.tsx	The dashboard and the phone simulator
+app/api/pay/[meterId]/route.js	The HTTP 402 door where meters pay
+app/api/xrpl/route.js	Owner actions: raise limit, stop, redeem points
+app/api/meter/route.js	The simulated meter counters
+scripts/initXrpl.mjs	One-time setup of accounts and channels
+scripts/meterAgent.mjs	The meter that tops itself up
+lib/shared.mjs	Services, prices and settings
+lib/ledger.mjs	XRPL helpers
+Next steps
+Use the official xrpl-mpp-sdk for the 402 flow instead of our own small version.
+Add a rand-pegged token so the budget does not move with the XRP price.
+Add a Stokvel Power Pot, where a group of neighbours shares an emergency fund with a multi-sign account.
+Test with a real sub-meter and a real USSD partner.
