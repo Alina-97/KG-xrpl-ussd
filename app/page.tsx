@@ -242,6 +242,14 @@ export default function KasiGridApp() {
                   >
                     Redeem 10 pts
                   </button>
+                  <button
+                  onClick={() => triggerOperatorAction('TEST_OVERDRAW')}
+                  disabled={loading}
+                  className="bg-red-50 hover:bg-red-100 disabled:opacity-40 text-red-800 border border-red-300 text-xs font-medium px-4 py-2.5 rounded transition"
+                >
+                  Test Overdraw Block
+                </button>
+
                 </div>
               </div>
             </section>
