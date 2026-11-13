@@ -40,7 +40,7 @@ A normal database can be hacked or edited to overcharge tenants, and traditional
 
 ---
 
-## 🖥️ How the Pieces Fit Together
+## How the Pieces Fit Together
 
 [ Basic Phone (*120*555#) ] ---> Set budget, check points, or send power to Mom (No data needed)
              │
