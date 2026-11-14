@@ -1,0 +1,37 @@
+{
+  "addresses": {
+    "utility": "rPzUQfxvYYAELTY7QeE7cK8Q9yFRK6QjQQ",
+    "tenant": "rB1oM1i5YEXy8QSJDn5uSfQk1qqmibrcut",
+    "sponsor": "rUsTPkH9u1JUbT8rMTmRafoYvZimp8mjNj"
+  },
+  "meters": [
+    {
+      "meterId": "POWER-101",
+      "service": "POWER",
+      "label": "Room 101 Power",
+      "source": "TENANT",
+      "channelId": "A75620CCD3FB4730885956B200F67C148BA24F2E9A6F73C68BDB0AA558B142C2"
+    },
+    {
+      "meterId": "WATER-101",
+      "service": "WATER",
+      "label": "Room 101 Water",
+      "source": "TENANT",
+      "channelId": "65E80E4D7C1AF419303C7041FBC5D3839857FA9F6BA9C80F2E248E65B5FF98A7"
+    },
+    {
+      "meterId": "WIFI-101",
+      "service": "WIFI",
+      "label": "Room 101 Wi-Fi",
+      "source": "TENANT",
+      "channelId": "407B029AF8476701AB6FD4DE2154344945E1DCDA62C884B4F4C44FE57812A39E"
+    },
+    {
+      "meterId": "MOM-FS-402",
+      "service": "POWER",
+      "label": "Mom's Meter (Free State)",
+      "source": "SPONSOR",
+      "channelId": "E21DA7370A2D2EDD6FE3E77FC708D77279A2232FD3FC22892BE0CDD4387F9C0E"
+    }
+  ]
+}

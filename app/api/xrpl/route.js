@@ -1,254 +1,102 @@
+// Owner side: read the dashboard, and let the human owner change limits.
+// The meter agent can NOT use these actions. They need the owner PIN and
+// the owner's own wallet, which the meter never has.
 import xrpl from 'xrpl';
 import { NextResponse } from 'next/server';
+import {
+  SERVICES, KASI_CODE, KASI_TO_REDEEM, REDEEM_UNITS, TF_CLOSE, ALLOWED_TOPUPS, DAILY_TOPUP_LIMIT,
+} from '../../../lib/shared.mjs';
+import { S, loadConfig, channelInfo, kasiBalance, send, wallet } from '../../../lib/ledger.mjs';
+
+export const dynamic = 'force-dynamic';
+
+const xrp = (drops) => Number(xrpl.dropsToXrp(String(drops)));
+const reply = (message, r, status = 200) =>
+  NextResponse.json({ message, ok: r ? r.ok : false, result: r?.code, hash: r?.hash || null }, { status });
 
 export async function GET() {
-  const client = new xrpl.Client('wss://s.altnet.rippletest.net:51233');
+  const cfg = loadConfig();
+  if (!cfg) return NextResponse.json({ setupNeeded: true });
   try {
-    await client.connect();
-
-    // 1. Payment Channel Analytics
-    const channels = await client.request({
-      command: 'account_channels',
-      account: process.env.TENANT_ADDRESS,
-    });
-    const channel = channels.result.channels?.find((c) => c.channel === process.env.CHANNEL_ID);
-    const totalCapXrp = channel ? Number(xrpl.dropsToXrp(channel.amount)) : 0;
-    const spentXrp = channel ? Number(xrpl.dropsToXrp(channel.balance)) : 0;
-
-    // 2. KASI Loyalty Points Balance
-    const lines = await client.request({
-      command: 'account_lines',
-      account: process.env.TENANT_ADDRESS,
-    });
-    const kasiLine = lines.result.lines?.find(
-      (l) => l.currency === process.env.LOYALTY_CURRENCY
+    const meters = await Promise.all(
+      cfg.meters.map(async (m) => {
+        const ch = await channelInfo(m.channelId);
+        const svc = SERVICES[m.service];
+        return {
+          meterId: m.meterId, label: m.label, service: m.service, unit: svc.unit, low: svc.low,
+          source: m.source, open: ch.open, units: S.units[m.meterId],
+          capXrp: xrp(ch.amount), spentXrp: xrp(ch.balance), remainingXrp: xrp(ch.amount - ch.balance),
+        };
+      })
     );
-    const loyaltyPoints = kasiLine ? Number(kasiLine.balance) : 0;
-
-    // 3. Payment Tracking History
-    const txHistory = await client.request({
-      command: 'account_tx',
-      account: process.env.TENANT_ADDRESS,
-      limit: 6,
-    });
-
-    const transactions = (txHistory.result.transactions || []).map((t) => {
-      const txData = t.tx_json || t.tx || {};
-      return {
-        hash: t.hash || txData.hash || Math.random().toString(),
-        type: txData.TransactionType || 'Transaction',
-        result: t.meta?.TransactionResult || 'tesSUCCESS',
-      };
-    });
-
-    await client.disconnect();
-
+    const loyaltyPoints = await kasiBalance(cfg.addresses.tenant);
+    const earnedXrp = xrp(S.receipts.filter((r) => r.ok).reduce((a, r) => a + r.drops, 0));
     return NextResponse.json({
-      totalCapXrp,
-      spentXrp,
-      remainingXrp: (totalCapXrp - spentXrp).toFixed(2),
-      loyaltyPoints,
-      channelId: process.env.CHANNEL_ID,
-      transactions,
+      meters, loyaltyPoints, receipts: S.receipts, earnedXrp,
+      agentOnline: Date.now() - S.agentSeen < 10_000, attackRequested: S.attackRequested,
     });
-  } catch (error) {
-    console.error('XRPL GET Error:', error);
-    if (client.isConnected()) await client.disconnect();
-    return NextResponse.json(
-      {
-        totalCapXrp: 0,
-        spentXrp: 0,
-        remainingXrp: '0.00',
-        loyaltyPoints: 0,
-        transactions: [],
-        error: error.message,
-      },
-      { status: 500 }
-    );
+  } catch (e) {
+    return NextResponse.json({ error: 'Cannot reach XRPL Testnet. ' + e.message }, { status: 502 });
   }
 }
 
 export async function POST(req) {
-  const client = new xrpl.Client('wss://s.altnet.rippletest.net:51233');
+  if (req.headers.get('x-owner-pin') !== (process.env.OWNER_PIN || '1234')) {
+    return reply('Wrong PIN.', null, 401);
+  }
+  const cfg = loadConfig();
+  if (!cfg) return reply('Run npm run setup first.', null, 400);
+
   try {
-    const { action, amount, meterId } = await req.json();
-    await client.connect();
+    const { action, meterId = 'POWER-101', amount } = await req.json();
+    const m = cfg.meters.find((x) => x.meterId === meterId);
+    if (!m && action !== 'REDEEM_LOYALTY' && action !== 'SETTLE_TO_BANK') return reply('Unknown meter.', null, 400);
 
-    const tenantWallet = xrpl.Wallet.fromSeed(process.env.TENANT_SEED);
-    const utilityWallet = xrpl.Wallet.fromSeed(process.env.UTILITY_SEED);
-
-    // 1. Human Operator increases monthly spending limit
+    // Owner raises the budget. Only the person who funded the channel can do this.
     if (action === 'INCREASE_LIMIT') {
-      const res = await client.submitAndWait(
-        {
-          TransactionType: 'PaymentChannelFund',
-          Account: tenantWallet.address,
-          Channel: process.env.CHANNEL_ID,
-          Amount: xrpl.xrpToDrops(String(amount || 10)),
-        },
-        { wallet: tenantWallet }
+      const add = Number(amount);
+      if (!ALLOWED_TOPUPS.includes(add)) return reply(`Choose ${ALLOWED_TOPUPS.join(', ')} XRP.`, null, 400);
+      const key = `${m.meterId}:${new Date().toISOString().slice(0, 10)}`;
+      if ((S.topups[key] || 0) + add > DAILY_TOPUP_LIMIT) return reply('Daily limit reached. Try tomorrow.', null, 429);
+      const w = wallet(m.source);
+      const r = await send(
+        { TransactionType: 'PaymentChannelFund', Account: w.address, Channel: m.channelId, Amount: xrpl.xrpToDrops(String(add)) },
+        w
       );
-
-      await client.disconnect();
-      return NextResponse.json({
-        message: `Limit increased by +${amount || 10} XRP on XRPL!`,
-        hash: res.result.hash,
-      });
+      if (r.ok) S.topups[key] = (S.topups[key] || 0) + add;
+      return reply(r.ok ? `Limit raised by ${add} XRP.` : `Ledger said ${r.code}.`, r);
     }
 
-    // 2. Smart Meter Agent spends 2 XRP when room drops < 2 kWh + awards 10 KASI pts
-    if (action === 'AGENT_TOPUP') {
-      const channels = await client.request({
-        command: 'account_channels',
-        account: process.env.TENANT_ADDRESS,
-      });
-      const currentSpentDrops = Number(channel?.balance || 0);
-      const newCumulativeDrops = String(currentSpentDrops + Number(xrpl.xrpToDrops('2')));
-
-      const signature = xrpl.signPaymentChannelClaim(
-        process.env.CHANNEL_ID,
-        newCumulativeDrops,
-        tenantWallet.privateKey
-      );
-
-      const claimRes = await client.submitAndWait(
-        {
-          TransactionType: 'PaymentChannelClaim',
-          Account: utilityWallet.address,
-          Channel: process.env.CHANNEL_ID,
-          Balance: newCumulativeDrops,
-          Amount: newCumulativeDrops,
-          Signature: signature,
-          PublicKey: tenantWallet.publicKey,
-        },
-        { wallet: utilityWallet }
-      );
-
-      // Award 10 KASI Loyalty Points
-      await client.submitAndWait(
-        {
-          TransactionType: 'Payment',
-          Account: utilityWallet.address,
-          Destination: tenantWallet.address,
-          Amount: {
-            currency: process.env.LOYALTY_CURRENCY,
-            value: '10',
-            issuer: utilityWallet.address,
-          },
-        },
-        { wallet: utilityWallet }
-      );
-
-      await client.disconnect();
-      return NextResponse.json({
-        message: 'Low power (<2 kWh)! Meter spent 2 XRP (+20 kWh) & earned +10 KASI pts!',
-        hash: claimRes.result.hash,
-      });
+    // Owner stops the spending. Unused XRP returns after the settle delay (60 s here).
+    if (action === 'CLOSE_CHANNEL') {
+      const w = wallet(m.source);
+      const r = await send({ TransactionType: 'PaymentChannelClaim', Account: w.address, Channel: m.channelId, Flags: TF_CLOSE }, w);
+      return reply(r.ok ? 'Stop requested. Unused XRP returns in about 60 seconds.' : `Ledger said ${r.code}.`, r);
     }
 
-    // 3. Cross-Province Family Top-Up ("Send Power to Mom in Gauteng")
-    if (action === 'SEND_TO_FAMILY') {
-      const res = await client.submitAndWait(
-        {
-          TransactionType: 'Payment',
-          Account: tenantWallet.address,
-          Destination: utilityWallet.address,
-          Amount: xrpl.xrpToDrops('5'),
-          Memos: [
-            {
-              Memo: {
-                MemoData: xrpl.convertStringToHex(`REMOTE_TOPUP:${meterId || 'MOM-GP-402'}`),
-              },
-            },
-          ],
-        },
-        { wallet: tenantWallet }
-      );
-
-      // Reward sender with +5 KASI Loyalty Points for supporting family
-      await client.submitAndWait(
-        {
-          TransactionType: 'Payment',
-          Account: utilityWallet.address,
-          Destination: tenantWallet.address,
-          Amount: {
-            currency: process.env.LOYALTY_CURRENCY,
-            value: '5',
-            issuer: utilityWallet.address,
-          },
-        },
-        { wallet: utilityWallet }
-      );
-
-      await client.disconnect();
-      return NextResponse.json({
-        message: `Sent 5 XRP (+50 kWh) to ${meterId || 'Mom (Gauteng)'}! Earned +5 KASI pts.`,
-        hash: res.result.hash,
-      });
-    }
-
-    // 4. Redeem 10 KASI Loyalty Points for free power
+    // Trade loyalty points for free power.
     if (action === 'REDEEM_LOYALTY') {
-      const res = await client.submitAndWait(
-        {
-          TransactionType: 'Payment',
-          Account: tenantWallet.address,
-          Destination: utilityWallet.address,
-          Amount: {
-            currency: process.env.LOYALTY_CURRENCY,
-            value: '10',
-            issuer: utilityWallet.address,
-          },
-        },
-        { wallet: tenantWallet }
+      const points = await kasiBalance(cfg.addresses.tenant);
+      if (points < KASI_TO_REDEEM) return reply(`Need ${KASI_TO_REDEEM} KASI. You have ${points}.`, null, 400);
+      const t = wallet('TENANT');
+      const r = await send(
+        { TransactionType: 'Payment', Account: t.address, Destination: cfg.addresses.utility,
+          Amount: { currency: KASI_CODE, issuer: cfg.addresses.utility, value: String(KASI_TO_REDEEM) } },
+        t
       );
-
-      await client.disconnect();
-      return NextResponse.json({
-        message: 'Redeemed 10 KASI points for +2 kWh Free Emergency Power!',
-        hash: res.result.hash,
-      });
+      if (r.ok) S.units['POWER-101'] += REDEEM_UNITS;
+      return reply(r.ok ? `Redeemed ${KASI_TO_REDEEM} KASI for ${REDEEM_UNITS} kWh free power.` : `Ledger said ${r.code}.`, r);
     }
 
-    // 5. Overdraw Attack Proof
-    if (action === 'TEST_OVERDRAW') {
-      try {
-        const overdrawDrops = xrpl.xrpToDrops('999');
-        const signature = xrpl.signPaymentChannelClaim(
-          process.env.CHANNEL_ID,
-          overdrawDrops,
-          tenantWallet.privateKey
-        );
-
-        await client.submitAndWait(
-          {
-            TransactionType: 'PaymentChannelClaim',
-            Account: utilityWallet.address,
-            Channel: process.env.CHANNEL_ID,
-            Balance: overdrawDrops,
-            Amount: overdrawDrops,
-            Signature: signature,
-            PublicKey: tenantWallet.publicKey,
-          },
-          { wallet: utilityWallet }
-        );
-      } catch (err) {
-        await client.disconnect();
-        return NextResponse.json({
-          blocked: true,
-          message: `XRPL LEDGER BLOCKED OVERDRAW:\n${err.message}`,
-        });
-      }
+    // MOCK cash-out so judges can see the path to a bank. No real money moves.
+    if (action === 'SETTLE_TO_BANK') {
+      const earned = xrp(S.receipts.filter((r) => r.ok).reduce((a, r) => a + r.drops, 0));
+      const rate = Number(process.env.DEMO_ZAR_PER_XRP || 10);
+      return reply(`MOCK payout: R${(earned * rate).toFixed(2)} to bank (${earned} XRP at a demo rate).`, { ok: true });
     }
 
-    await client.disconnect();
-    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
-  } catch (error) {
-    console.error('XRPL POST Error:', error);
-    if (client.isConnected()) await client.disconnect();
-    return NextResponse.json(
-      { message: `Error: ${error.message}`, error: error.message },
-      { status: 500 }
-    );
+    return reply('Unknown action.', null, 400);
+  } catch (e) {
+    return reply('Error: ' + e.message, null, 500);
   }
 }

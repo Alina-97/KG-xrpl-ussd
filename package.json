@@ -6,11 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "setup": "node scripts/initXrpl.mjs",
+    "agent": "node --env-file=.env.agent scripts/meterAgent.mjs",
+    "agent:demo": "node --env-file=.env.agent scripts/meterAgent.mjs --drain"
   },
   "dependencies": {
+    "@tailwindcss/postcss": "^4.3.5",
     "dotenv": "^18.0.10",
     "next": "16.4.6",
+    "postcss": "^8.5.33",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "xrpl": "^5.3.0"
@@ -18,11 +23,11 @@
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^20",
-    "@types/react": "^19",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
-    "tailwindcss": "4.3.3",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5"
   }
 }
