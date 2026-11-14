@@ -4,12 +4,9 @@ Power that tops itself up.
 
 ShebiSpark is a smart meter that buys its own electricity, water and Wi-Fi in small steps. The owner sets a budget from a basic button phone. The meter can never spend more than that budget, because the XRP Ledger enforces the limit, not our app.
 
-Built by Shebi (Mamoshebe Alina Mokhathi) for the Node Engine Hackathon 2026. GitHub: Alina-97.
-
 Testnet only. No real money is used anywhere in this project.
 
-The problem
-
+THE PROBLEM
 In townships like Tembisa, Soweto and Khayelitsha, many people rent backyard rooms with their own sub-meter.
 
 Many have a button phone with no data, and no bank app.
@@ -26,7 +23,7 @@ The owner gets KASI points. Points can be traded for free emergency power.
 
 Every purchase leaves a receipt with a link to the XRP Ledger.
 
-Where the blockchain is used
+WHERE BLOCKCHAIN IS USED
 On the XRP Ledger (needs trust)	Not on the ledger (does not need it)
 The spending limit (Payment Channel)	USSD menus
 Every claim, with a public record	Meter readings
